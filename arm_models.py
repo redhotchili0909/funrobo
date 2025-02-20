@@ -589,11 +589,19 @@ class FiveDOFRobot:
             theta: List of joint angles (in degrees or radians).
             radians: Boolean flag to indicate if input angles are in radians.
         """
-        ########################################
+        theta = np.array(theta)
 
-        # insert your code here
+        if not radians:
+            theta = np.radians(theta)
+        
+        for i in range(self.num_dof):
+            self.DH[i][0] = theta[i]
 
-        ########################################
+        self.update_homogenous_matrix()
+        T_final = np.eye(4,4)
+        T_final = np.dot(T_final, self.T[0])
+        for i in range(1, self.num_dof):
+            T_final = np.dot(T_final, self.T[i])
         
         # Calculate robot points (positions of joints)
         self.calc_robot_points()
