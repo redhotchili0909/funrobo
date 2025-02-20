@@ -500,13 +500,6 @@ class ScaraRobot():
         self.EE_axes[1] = self.T_ee[:3,1] * 0.075 + self.points[-1][0:3]
         self.EE_axes[2] = self.T_ee[:3,2] * 0.075 + self.points[-1][0:3]
 
-def dh_transform(theta, d, a, alpha):
-    return np.array([
-        [np.cos(theta), -np.sin(theta) * np.cos(alpha), np.sin(theta) * np.sin(alpha), a * np.cos(theta)],
-        [np.sin(theta), np.cos(theta) * np.cos(alpha), -np.cos(theta) * np.sin(alpha), a * np.sin(theta)],
-        [0, np.sin(alpha), np.cos(alpha), d],
-        [0, 0, 0, 1]
-    ])
 
 class FiveDOFRobot:
     """
@@ -549,6 +542,7 @@ class FiveDOFRobot:
         self.points = [None] * (self.num_dof + 1)
 
         # Denavit-Hartenberg parameters and transformation matrices
+        # theta[0], d[1], a[2], alpha[3]
         self.DH = np.array([
             [self.theta[0], self.l1, 0, np.pi/2],  # Joint 1
             [self.theta[1] - np.pi/2, 0, self.l2, 0],  # Joint 2
@@ -559,6 +553,33 @@ class FiveDOFRobot:
 
         self.T = np.zeros((self.num_dof, 4, 4))
 
+    def update_homogenous_matrix(self):
+        """
+        Update the transform matrix (5 x 4 x 4) with the DH table
+        """
+
+        for i in range(self.num_dof):
+            self.T[i] = np.array([
+            [
+                np.cos(self.DH[i][0]), 
+                -np.sin(self.DH[i][0])*np.cos(self.DH[i][3]), 
+                sin(self.DH[i][0]*self.DH[i][3], 
+                self.DH[i][3]*np.cos(self.DH[i][0]))
+            ],
+            [
+                np.sin(self.DH[i][0]),
+                np.cos(self.DH[i][0])*np.cos(self.DH[i][3]),
+                -np.cos(self.DH[i][0]*np.sin(self.DH[i][3])),
+                self.DH[i][3]*np.sin(self.DH[i][0])
+            ],
+            [
+                0,
+                np.sin(self.DH[i][3]),
+                np.cos(self.DH[i][3]),
+                self.DH[i][1]
+            ],
+            [0, 0, 0, 1]
+        ])
     
     def calc_forward_kinematics(self, theta: list, radians=False):
         """
