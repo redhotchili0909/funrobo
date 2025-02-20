@@ -557,29 +557,15 @@ class FiveDOFRobot:
         """
         Update the transform matrix (5 x 4 x 4) with the DH table
         """
-
         for i in range(self.num_dof):
+            theta, d, a, alpha = self.DH[i] 
+
             self.T[i] = np.array([
-            [
-                np.cos(self.DH[i][0]), 
-                -np.sin(self.DH[i][0])*np.cos(self.DH[i][3]), 
-                sin(self.DH[i][0]*self.DH[i][3], 
-                self.DH[i][3]*np.cos(self.DH[i][0]))
-            ],
-            [
-                np.sin(self.DH[i][0]),
-                np.cos(self.DH[i][0])*np.cos(self.DH[i][3]),
-                -np.cos(self.DH[i][0]*np.sin(self.DH[i][3])),
-                self.DH[i][3]*np.sin(self.DH[i][0])
-            ],
-            [
-                0,
-                np.sin(self.DH[i][3]),
-                np.cos(self.DH[i][3]),
-                self.DH[i][1]
-            ],
-            [0, 0, 0, 1]
-        ])
+                [np.cos(theta), -np.sin(theta) * np.cos(alpha),  np.sin(theta) * np.sin(alpha), a * np.cos(theta)],
+                [np.sin(theta),  np.cos(theta) * np.cos(alpha), -np.cos(theta) * np.sin(alpha), a * np.sin(theta)],
+                [0,             np.sin(alpha),                 np.cos(alpha),                 d],
+                [0,             0,                              0,                              1]
+            ])
     
     def calc_forward_kinematics(self, theta: list, radians=False):
         """
@@ -589,20 +575,21 @@ class FiveDOFRobot:
             theta: List of joint angles (in degrees or radians).
             radians: Boolean flag to indicate if input angles are in radians.
         """
-        theta = np.array(theta)
-
         if not radians:
             theta = np.radians(theta)
         
         for i in range(self.num_dof):
-            self.DH[i][0] = theta[i]
+            self.DH[i,0] = theta[i]
 
         self.update_homogenous_matrix()
-        T_final = np.eye(4,4)
-        T_final = np.dot(T_final, self.T[0])
-        for i in range(1, self.num_dof):
+        T_final = np.eye(4)
+        for i in range(self.num_dof):
             T_final = np.dot(T_final, self.T[i])
-        
+
+        self.ee.x, self.ee.y, self.ee.z = T_final[:3, 3]
+        rpy = rotm_to_euler(T_final[:3, :3])
+        self.ee.rotx, self.ee.roty, self.ee.rotz = rpy[2], rpy[1], rpy[0]
+
         # Calculate robot points (positions of joints)
         self.calc_robot_points()
 
