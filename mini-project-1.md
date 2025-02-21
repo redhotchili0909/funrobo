@@ -18,7 +18,7 @@ This assignment will count towards your **final course grade**. It is a team-bas
 - Derive the inverse jacobian matrix and implement a resolved-rate motion control (RRMC) with verification in the Viz tool
 
 **Problem 3**
-- Implement the resolved-rate motion control (RRMC) through gamepad control of the 5DOF robot hardware
+- Implement the resolved-rate motion control (RRMC) through gamepad control of the 5DOF robot hardware (**For instructions on how to use the Hiwonder robot platform, please** [**see here**](https://github.com/OlinCollege-FunRobo/hiwonder-armpi-pro))
 
 <br />
 
