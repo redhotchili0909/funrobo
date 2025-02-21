@@ -545,10 +545,10 @@ class FiveDOFRobot:
         # theta[0], d[1], a[2], alpha[3]
         self.DH = np.array([
             [self.theta[0], self.l1, 0, np.pi/2],  # Joint 1
-            [self.theta[1] - np.pi/2, 0, self.l2, 0],  # Joint 2
+            [self.theta[1], 0, self.l2, 0],  # Joint 2
             [self.theta[2], 0, self.l3, 0],  # Joint 3
-            [self.theta[3], 0, self.l4, 0],  # Joint 4
-            [self.theta[4] - np.pi/2, self.l5, 0, -np.pi/2]  # Joint 5
+            [self.theta[3], 0, 0, np.pi/2],  # Joint 4
+            [self.theta[4], self.l5, 0, 0]  # Joint 5
         ])
 
         self.T = np.zeros((self.num_dof, 4, 4))
@@ -559,12 +559,11 @@ class FiveDOFRobot:
         """
         for i in range(self.num_dof):
             theta, d, a, alpha = self.DH[i] 
-
             self.T[i] = np.array([
-                [np.cos(theta), -np.sin(theta) * np.cos(alpha),  np.sin(theta) * np.sin(alpha), a * np.cos(theta)],
-                [np.sin(theta),  np.cos(theta) * np.cos(alpha), -np.cos(theta) * np.sin(alpha), a * np.sin(theta)],
-                [0,             np.sin(alpha),                 np.cos(alpha),                 d],
-                [0,             0,                              0,                              1]
+                [np.cos(theta), -np.sin(theta) * np.cos(alpha), np.sin(theta) * np.sin(alpha), a * np.cos(theta)],
+                [np.sin(theta), np.cos(theta) * np.cos(alpha), -np.cos(theta) * np.sin(alpha), a * np.sin(theta)],
+                [0, np.sin(alpha), np.cos(alpha), d],
+                [0, 0, 0, 1]
             ])
     
     def calc_forward_kinematics(self, theta: list, radians=False):
@@ -585,10 +584,6 @@ class FiveDOFRobot:
         T_final = np.eye(4)
         for i in range(self.num_dof):
             T_final = np.dot(T_final, self.T[i])
-
-        self.ee.x, self.ee.y, self.ee.z = T_final[:3, 3]
-        rpy = rotm_to_euler(T_final[:3, :3])
-        self.ee.rotx, self.ee.roty, self.ee.rotz = rpy[2], rpy[1], rpy[0]
 
         # Calculate robot points (positions of joints)
         self.calc_robot_points()
@@ -625,15 +620,37 @@ class FiveDOFRobot:
         Calculate the joint velocities required to achieve the given end-effector velocity.
         
         Args:
-            vel: Desired end-effector velocity (3x1 vector).
+            vel: Desired end-effector velocity [vx, vy, vz, wx, wy, wz].
         """
-        ########################################
+        n = self.num_dof
 
-        # insert your code here
+        self.calc_forward_kinematics(self.theta, radians=True)
 
-        ########################################
+        J = np.zeros((6, n))
 
-        # Recompute robot points based on updated joint angles
+        p_e = np.array([self.ee.x, self.ee.y, self.ee.z])
+
+        T_cumulative = np.eye(4)
+
+        for i in range(n):
+            T_cumulative = np.dot(T_cumulative, self.T[i])
+
+            p_i = T_cumulative[:3, 3]  # Joint position
+            z_i = T_cumulative[:3, 2]  # Joint rotation axis
+
+            # Compute linear velocity Jacobian J_v
+            J[:3, i] = np.cross(z_i, (p_e - p_i))
+
+            # Compute angular velocity Jacobian J_w
+            J[3:, i] = z_i
+
+        # Compute joint velocities: θ_dot = J_pseudo_inverse * velocity
+        joint_v = np.linalg.pinv(J) @ np.array(vel)
+
+        print("Computed Joint Velocities:", joint_v)
+
+        # Update with new joint velocities
+        self.theta = [self.theta[i] + joint_v[i] * 0.05 for i in range(n)]
         self.calc_forward_kinematics(self.theta, radians=True)
 
 
