@@ -205,9 +205,6 @@ class Robot:
         self.sub1.set_xlabel('x [m]')
         self.sub1.set_ylabel('y [m]')
 
-
-
-
 class TwoDOFRobot():
     """
     Represents a 2-degree-of-freedom (DOF) robot arm with two joints and one end effector.
@@ -362,8 +359,6 @@ class TwoDOFRobot():
         self.EE_axes[0] = np.array([cos(self.theta[0] + self.theta[1]), sin(self.theta[0] + self.theta[1]), 0]) * 0.075 + self.points[2]
         self.EE_axes[1] = np.array([-sin(self.theta[0] + self.theta[1]), cos(self.theta[0] + self.theta[1]), 0]) * 0.075 + self.points[2]
         self.EE_axes[2] = np.array([0, 0, 1]) * 0.075 + self.points[2]
-
-
 
 class ScaraRobot():
     """
@@ -626,10 +621,13 @@ class FiveDOFRobot:
 
         self.calc_forward_kinematics(self.theta, radians=True)
 
-        J = np.zeros((6, n))
+        # initializing jacobian matrixnp.linalg.pinv(J)
+        J = np.zeros((3, n))
 
+        # getting EE position
         p_e = np.array([self.ee.x, self.ee.y, self.ee.z])
 
+        # Finding the final transformation matrix
         T_cumulative = np.eye(4)
 
         for i in range(n):
@@ -642,15 +640,16 @@ class FiveDOFRobot:
             J[:3, i] = np.cross(z_i, (p_e - p_i))
 
             # Compute angular velocity Jacobian J_w
-            J[3:, i] = z_i
+            # J[3:, i] = z_i
+
 
         # Compute joint velocities: θ_dot = J_pseudo_inverse * velocity
-        joint_v = np.linalg.pinv(J) @ np.array(vel)
-
-        print("Computed Joint Velocities:", joint_v)
+        # np.linalg.inv(np.linalg.pinv(J) @ J)
+        joint_v = (np.linalg.pinv(J) @ J) @ (np.linalg.pinv(J) @ np.array(vel))
 
         # Update with new joint velocities
         self.theta = [self.theta[i] + joint_v[i] * 0.05 for i in range(n)]
+
         self.calc_forward_kinematics(self.theta, radians=True)
 
 
