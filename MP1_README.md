@@ -27,5 +27,5 @@ We then initialize a Jacobian matrix and iteratively compute its elements by ext
 Visualizer: https://www.youtube.com/watch?v=0h8nh2I-8vQ
 
 Physical Robot: 
-- Part 1: [Video Link](https://drive.google.com/file/d/11QEZmELQBAB_M4YK3fwwU9ZK_hN1ojpZ/view?usp=sharing)
+- Part 1: [Video Link](https://drive.google.com/file/d/1TvL4BzMpvhX_pkL2bfbgio_u2IYsQSbX/view?usp=drive_link)
 - Part 2: [Video Link](https://drive.google.com/file/d/1BrRJkHzDXgy8Xag4MnWLZKQ6sB9ykE6d/view?usp=sharing)
