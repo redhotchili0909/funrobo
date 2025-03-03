@@ -22,8 +22,10 @@ We then initialize a Jacobian matrix and iteratively compute its elements by ext
 
 <img src = "media/inverse_jacobian.png">
 
-## Problem 3: Visualization and Hardware Control
+## Visualization and Hardware Control
 
-Visualizer Video: https://www.youtube.com/watch?v=0h8nh2I-8vQ
+Visualizer: https://www.youtube.com/watch?v=0h8nh2I-8vQ
 
-Physical Robot Video: 
+Physical Robot: 
+- Part 1: [Video Link](https://drive.google.com/file/d/11QEZmELQBAB_M4YK3fwwU9ZK_hN1ojpZ/view?usp=sharing)
+- Part 2: [Video Link](https://drive.google.com/file/d/1BrRJkHzDXgy8Xag4MnWLZKQ6sB9ykE6d/view?usp=sharing)
