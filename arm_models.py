@@ -594,7 +594,31 @@ class FiveDOFRobot:
         """
         ########################################
 
-        # insert your code here
+        # Analytical Solution 
+
+        # Angle 3
+        L = np.sqrt(EE.x^2 + EE.y^2)
+        beta = np.arccos((L^2 -(self.l1^2 + self.l2^2)) / -(2 * self.l1 * self.l2))
+
+        self.theta[2] = 180 - beta
+        # Multiple solitions
+        # self.theta[1] = [180 - beta, -(180 - beta)]
+
+        # Angle 2
+        alpha = np.arctan(EE.y/EE.x)
+        psi = np.arctan((self.l2 * np.sin(self.theta[1])) / self.l1 + self.l2*np.cos(self.theta[1]))
+
+        self.theta[1] = alpha - psi
+        # Multiple Solutions
+        # self.theta[0] = [alpha-psi, alpha+psi]
+
+        # Angle 1
+        self.theta[0] = np.arctan(EE.y / EE.x)
+        # Multiple Solutions
+        self.theta[0] = [np.pi + np.arctan(EE.y / EE.x), np.arctan(EE.y / EE.x)]
+
+
+        # STEP 3
 
         ########################################
 
@@ -645,7 +669,8 @@ class FiveDOFRobot:
 
         # Compute joint velocities: θ_dot = J_pseudo_inverse * velocity
         # np.linalg.inv(np.linalg.pinv(J) @ J)
-        joint_v = (np.linalg.pinv(J) @ J) @ (np.linalg.pinv(J) @ np.array(vel))
+        joint_v = np.linalg.pinv(J) @ np.array(vel)
+            #(np.linalg.pinv(J) @ J) @ (np.linalg.pinv(J) @ np.array(vel))
 
         # Update with new joint velocities
         self.theta = [self.theta[i] + joint_v[i] * 0.05 for i in range(n)]
