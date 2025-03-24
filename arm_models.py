@@ -537,16 +537,18 @@ class FiveDOFRobot:
         self.points = [None] * (self.num_dof + 1)
 
         # Denavit-Hartenberg parameters and transformation matrices
-        # theta[0], d[1], a[2], alpha[3]
+        # DH Table [theta, d, a, alpha]
         self.DH = np.array([
-            [self.theta[0], self.l1, 0, np.pi/2],  # Joint 1
-            [self.theta[1], 0, self.l2, 0],  # Joint 2
-            [self.theta[2], 0, self.l3, 0],  # Joint 3
-            [self.theta[3], 0, 0, np.pi/2],  # Joint 4
-            [self.theta[4], self.l5, 0, 0]  # Joint 5
+            [self.theta[0],  self.l1,  0,   np.pi/2],  
+            [self.theta[1] + np.pi/2, 0,  self.l2,  -np.pi],  
+            [self.theta[2],  0,  self.l3,   np.pi],  
+            [self.theta[3] - np.pi/2, 0,  0,  -np.pi/2],  
+            [self.theta[4],  self.l4 + self.l5,  0,   0]  
         ])
 
         self.T = np.zeros((self.num_dof, 4, 4))
+
+        self.R_03 = np.zeros(3, 3)
 
     def update_homogenous_matrix(self):
         """
@@ -594,7 +596,9 @@ class FiveDOFRobot:
         """
         ########################################
 
-        # Analytical Solution 
+        # Analytical Solution \
+
+        # STEP 2
 
         # Angle 3
         L = np.sqrt(EE.x^2 + EE.y^2)
@@ -619,6 +623,20 @@ class FiveDOFRobot:
 
 
         # STEP 3
+        for i in range(3):
+            theta, d, a, alpha = self.DH[i] 
+            self.T[i] = np.array([
+                [np.cos(theta), -np.sin(theta) * np.cos(alpha), np.sin(theta) * np.sin(alpha), a * np.cos(theta)],
+                [np.sin(theta), np.cos(theta) * np.cos(alpha), -np.cos(theta) * np.sin(alpha), a * np.sin(theta)],
+                [0, np.sin(alpha), np.cos(alpha), d],
+                [0, 0, 0, 1]
+            ])
+
+        H_03 = np.eye(4)
+        for i in range(3):
+            H_03 = np.dot(H_03, self.T[i])
+
+        self.R_03 = H_03[:3, :3]
 
         ########################################
 
