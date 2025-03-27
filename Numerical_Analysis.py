@@ -1,5 +1,5 @@
 def tm_solver(theta_init):
-    """Solves a transformation matrix and returns the matrix and its isolated position outputs.
+    """Solves a transformation matrix and returns said matrix and its isolated position outputs.
     For given theta values:
     - Plugs in and solves transformation matrix.
     - Finds the end effector position from given theta values.
@@ -13,6 +13,7 @@ def tm_solver(theta_init):
     """
     import math
 
+    # Declare variables storing the angle input values and values from the DH table
     theta_0 = theta_init
     t1 = theta_0[0]
     t2 = theta_0[1]
@@ -29,6 +30,7 @@ def tm_solver(theta_init):
     d1 = l1
     d5 = l4 + l5
 
+    # Finding each component of the transformation matrix and substituting variables
     n11 = math.cos(t1 + t2 + t3 + t4 + t5) + math.sin(t1 + t5)
     n12 = -math.sin(t5) * math.cos(t1 + t2 + t3 + t4) + math.sin(t1) * math.cos(t5)
     n13 = math.cos(t1) * math.sin(t2 + t3 + t4)
@@ -46,6 +48,7 @@ def tm_solver(theta_init):
     n33 = -math.cos(t2 + t3 + t4)
     n34 = -d5 * math.cos(t2 + t3 + t4) + a3 * math.sin(t2 + t3) + a2 * math.sin(t2) + d1
 
+    # Compiling the transformation matrix
     TM = [
         [n11, n21, n31, 0],
         [n12, n22, n32, 0],
@@ -53,7 +56,10 @@ def tm_solver(theta_init):
         [n14, n24, n34, 1],
     ]
 
+    # Isolating the position outputs of the transformation matrix
     Pos = [round(n14, 3), round(n24, 3), round(n34, 3)]
+
+    # Return the matrix and the isolated position values
     return [TM, Pos]
 
 
@@ -237,24 +243,78 @@ def num_analysis(xd, theta_0, n):
     """
     import numpy as np
 
+    # Convert radians to degrees for visual output in terminal
+    rad2deg = float(180 / np.pi)
+
+    # Initialize theta_i
     theta_i = theta_0
+
+    # Extract end-effector position
     ee_p = np.array(tm_solver(theta_i)[1])
+
+    # Calculate error between desired and actual end-effector position
     g = np.array(xd) - ee_p
+
+    # initialize iteration counter
     i = 0
+
+    # Print the end-effector position from our initial guess of theta to guide the user to make better guesses
+    print(ee_p)
+
+    # While the end-effector is not at the desired position run this code
     while np.all(g) != 0:
+
+        # Declare pseudoinverse of the jacobian matrix extracted from the function
         psinvj = inverse_jacobian(theta_i)
+
+        # Reshape the matrix in order to be able to multiply it by the error array
         psinvj_reshaped = psinvj.reshape((5, 3))
-        ## with a pseudoinverse/inverse depending on its dimension
+
+        # Updating theta values at each iteration
         theta_i = theta_i + np.dot(psinvj_reshaped, g)  # Future angle value
+
+        # Calculate end-effector position for the updated theta values
         ee_p = np.array(tm_solver(theta_i)[1])
+
+        # Check to see if the stopping critera has been met
         g = np.array(xd) - ee_p
+
+        # Update i to track the number of iterations
         i = i + 1
+
+        # If the max number of iterations is surpassed
         if i >= n:
+            # Print that there is no numerical solution for the given
+            print("There is no numerical solution")
+
+            # End the function to prevent an endless loop
             break
     else:
-        print("The joint angles satisfy the desired end-effector position.")
-        print("It took " + str(i) + " iterations")
+        # If the stopping criteria are met / the error is = 0
+        # Convert radians to degrees and round values
+        theta_deg = np.round(theta_i * rad2deg, 3)
+        print(
+            "The joint angles (in degrees) "
+            + str(theta_deg[0])
+            + ", "
+            + str(theta_deg[1])
+            + ", "
+            + str(theta_deg[2])
+            + ", "
+            + str(theta_deg[3])
+            + ", and "
+            + str(theta_deg[4])
+            + " satisfy the desired end-effector position."
+        )
+        print("It took " + str(i) + " iterations to find the angle values")
+        return np.round(theta_i, 3)
 
 
-theta_inits = [0.3, 0.2, 0.5, 0.9, 0.2]
-num_analysis([0.45, 0.12, 0.42], theta_inits, 100)
+# Declare an array of initial angle guesses
+theta_inits = [0.4, 0.5, 0.6, 0.2, 0.1]
+
+# Declare an array including the desired end-effector position
+desired_eep = [0.7, 0.445, 0.264]
+
+# Attempt to find the theta values that will result in the desired end-effector position
+theta_vals = num_analysis(desired_eep, theta_inits, 500)
