@@ -19,10 +19,15 @@ def tm_solver(theta_init):
     t3 = theta_0[2]
     t4 = theta_0[3]
     t5 = theta_0[4]
-    a2 = 2
-    a3 = 3
-    d1 = 4
-    d5 = 5
+    l1 = 0.30
+    l2 = 0.15
+    l3 = 0.18
+    l4 = 0.15
+    l5 = 0.12
+    a2 = l2
+    a3 = l3
+    d1 = l1
+    d5 = l4 + l5
 
     n11 = math.cos(t1 + t2 + t3 + t4 + t5) + math.sin(t1 + t5)
     n12 = -math.sin(t5) * math.cos(t1 + t2 + t3 + t4) + math.sin(t1) * math.cos(t5)
@@ -244,13 +249,12 @@ def num_analysis(xd, theta_0, n):
         ee_p = np.array(tm_solver(theta_i)[1])
         g = np.array(xd) - ee_p
         i = i + 1
-        print(i)
-        print(g)
         if i >= n:
             break
     else:
         print("The joint angles satisfy the desired end-effector position.")
+        print("It took " + str(i) + " iterations")
 
 
-theta_inits = [12, 13, 15, 19, 25]
-num_analysis([3, 4, 5], theta_inits, 10)
+theta_inits = [0.3, 0.2, 0.5, 0.9, 0.2]
+num_analysis([0.45, 0.12, 0.42], theta_inits, 100)
