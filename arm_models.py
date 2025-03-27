@@ -2,6 +2,7 @@ from math import sin, cos
 import numpy as np
 from matplotlib.figure import Figure
 from helper_fcns.utils import EndEffector, rotm_to_euler
+import sympy as sp
 
 PI = 3.1415926535897932384
 np.set_printoptions(precision=3)
@@ -542,13 +543,12 @@ class FiveDOFRobot:
             [self.theta[0],  self.l1,  0,   np.pi/2],  
             [self.theta[1] + np.pi/2, 0,  self.l2,  -np.pi],  
             [self.theta[2],  0,  self.l3,   np.pi],  
-            [self.theta[3] - np.pi/2, 0,  0,  -np.pi/2],  
-            [self.theta[4],  self.l4 + self.l5,  0,   0]  
+            [self.theta[3] - np.pi/2, 0,  0,  -np.pi/2],  # theta 4
+            [self.theta[4],  self.l4 + self.l5,  0,   0]  # theta 5
         ])
 
         self.T = np.zeros((self.num_dof, 4, 4))
-
-        self.R_03 = np.zeros(3, 3)
+        self.T_final = np.eye(4)
 
     def update_homogenous_matrix(self):
         """
@@ -571,16 +571,15 @@ class FiveDOFRobot:
             theta: List of joint angles (in degrees or radians).
             radians: Boolean flag to indicate if input angles are in radians.
         """
-        if not radians:
-            theta = np.radians(theta)
+        # if not radians:
+        #     theta = np.radians(theta)
         
         for i in range(self.num_dof):
             self.DH[i,0] = theta[i]
 
         self.update_homogenous_matrix()
-        T_final = np.eye(4)
         for i in range(self.num_dof):
-            T_final = np.dot(T_final, self.T[i])
+            self.T_final = np.dot(self.T_final, self.T[i])
 
         # Calculate robot points (positions of joints)
         self.calc_robot_points()
@@ -596,20 +595,37 @@ class FiveDOFRobot:
         """
         ########################################
 
-        # Analytical Solution \
+        # Analytical Solution 
+
+        # STEP 1
+        self.calc_forward_kinematics(self.theta)
+        # extract 0 to 6 rotation form t final, multipluing all the DH matrices
+        R_05 = self.T_final[:3, :3]
+
+        EE_pos = np.array([EE.x, EE.y, EE.z]).reshape(3, 1)
+
+        vec = np.array([0, 0, 1]).reshape(3, 1)
+
+        # pwrist = np.array([EE.x, EE.y, EE.z]).reshape(3, 1) - (self.l4 + self.l5) * R_06 * np.array([0, 0, 1]).reshape(3, 1)
+        pwrist = EE_pos - ((self.l4 + self.l5) * np.dot(R_05, vec))
+        print(EE_pos)
+        print(vec)
+        print(f"PWRIST IS: {pwrist}")
 
         # STEP 2
-
+        x = pwrist[0]
+        y = pwrist[1]
+        z = pwrist[2]
         # Angle 3
-        L = np.sqrt(EE.x^2 + EE.y^2)
-        beta = np.arccos((L^2 -(self.l1^2 + self.l2^2)) / -(2 * self.l1 * self.l2))
+        L = np.sqrt(x**2 + y**2)
+        beta = np.arccos((L**2 -(self.l1**2 + self.l2**2)) / -(2 * self.l1 * self.l2))
 
         self.theta[2] = 180 - beta
         # Multiple solitions
         # self.theta[1] = [180 - beta, -(180 - beta)]
 
         # Angle 2
-        alpha = np.arctan(EE.y/EE.x)
+        alpha = np.arctan(y/x)
         psi = np.arctan((self.l2 * np.sin(self.theta[1])) / self.l1 + self.l2*np.cos(self.theta[1]))
 
         self.theta[1] = alpha - psi
@@ -617,9 +633,9 @@ class FiveDOFRobot:
         # self.theta[0] = [alpha-psi, alpha+psi]
 
         # Angle 1
-        self.theta[0] = np.arctan(EE.y / EE.x)
+        self.theta[0] = np.arctan(y / x)
         # Multiple Solutions
-        self.theta[0] = [np.pi + np.arctan(EE.y / EE.x), np.arctan(EE.y / EE.x)]
+        self.theta[0] = [np.pi + np.arctan(y / x), np.arctan(y / x)]
 
 
         # STEP 3
@@ -636,7 +652,55 @@ class FiveDOFRobot:
         for i in range(3):
             H_03 = np.dot(H_03, self.T[i])
 
-        self.R_03 = H_03[:3, :3]
+        R_03 = H_03[:3, :3]
+
+
+        # STEP 4
+        R_35 = np.dot(R_03.T, R_05)
+
+        # Computing symbolic rotation
+
+        # Define symbolic variables
+        theta4, theta5, alpha4, alpha5 = sp.symbols('theta4 theta5 alpha4 alpha5')
+        # Define 3x3 rotation matrices extracted from homogeneous transformation
+        R4 = sp.Matrix([
+            [sp.cos(theta4), -sp.sin(theta4) * sp.cos(alpha4), sp.sin(theta4) * sp.sin(alpha4)],
+            [sp.sin(theta4), sp.cos(theta4) * sp.cos(alpha4), -sp.cos(theta4) * sp.sin(alpha4)],
+            [0, sp.sin(alpha4), sp.cos(alpha4)]
+        ])
+
+        R5 = sp.Matrix([
+            [sp.cos(theta5), -sp.sin(theta5) * sp.cos(alpha5), sp.sin(theta5) * sp.sin(alpha5)],
+            [sp.sin(theta5), sp.cos(theta5) * sp.cos(alpha5), -sp.cos(theta5) * sp.sin(alpha5)],
+            [0, sp.sin(alpha5), sp.cos(alpha5)]
+        ])
+        # Compute the symbolic product R4 * R5
+        R_product = R4 * R5
+
+        # Display result
+        sp.pprint(R_product)
+
+        # STEP 5 - decompsose to get real angles (theta 4 and theta 5)
+
+        # Angle 4 (symbolic)
+        # Extract y (R_product[2][0]) and x (R_product[2][1])
+        y4 = R_product[2, 0]  # sin(alpha4) * sin(theta5)
+        x4 = R_product[2, 1]  # sin(alpha4) * cos(theta5)
+
+        # Compute theta4 using atan2
+        theta4_solution = sp.atan2(y4, x4)
+
+        # Angle 5 (symbolic)
+        # Extract y (R_product[2][1]) and x (R_product[2][2])
+        y5 = R_product[2, 1]  # sin(alpha4) * cos(theta5)
+        x5 = R_product[2, 2]  # cos(alpha4)
+
+        # Compute theta5 using atan2
+        theta5_solution = sp.atan2(y5, x5)
+
+        
+
+
 
         ########################################
 
