@@ -832,11 +832,78 @@ class FiveDOFRobot:
             soln: Optional parameter for multiple solutions (not implemented).
         """
         ########################################
+        # ANALYTICAL SOLUTION
 
-        # insert your code here
+        self.calc_forward_kinematics(self.theta, radians=True)
+
+        # Find total transformation matrix from frame 0 to frame 5
+        T_05 = np.zeros((4, 4))
+        for i in range(self.num_dof):
+            T_05 = np.dot(T_05, self.T[i])
+        
+
+        # Find pwrist
+        EE_pos = np.array([EE.x, EE.y, EE.z]).reshape(3, 1)
+
+        vec = np.array([0, 0, 1]).reshape(3, 1)
+
+        pwrist = EE_pos - ((self.l4 + self.l5) * np.dot(R_05, vec))
+
+        # Declare endeffector position as the end point of pwrist
+        x = pwrist[0]
+        y = pwrist[1]
+        z = pwrist[2]
+
+
+
+        # SOLVING FOR THETA 3
+        L = np.sqrt(x**2 + y**2)
+        beta = np.arccos((L**2 -(self.l1**2 + self.l2**2)) / -(2 * self.l1 * self.l2))
+
+        angle_3 = [-180-beta, 180-beta]
+        # some math
+        self.theta[2] = 
+
+        # Computing analytical rotation matrix to compare with
+
+
+
+        # SOLVING FOR THETA 2
+        alpha = np.arctan(y/x)
+        psi = np.arctan((self.l2 * np.sin(self.theta[1])) / self.l1 + self.l2*np.cos(self.theta[1]))
+
+        angle_2 = [alpha - psi, alpha + psi]
+        #some math
+        self.theta[1] = alpha - psi
+
+
+        # SOLVING FOR THETA 1
+        angle_1 = [np.pi + np.arctan(y / x), np.arctan(y / x)]
+        #some math
+        self.theta[0] = 
+
+
+        #stpe 4
+        R_03 = 
+
+        # Extracting rotation matrix from total transformation matrix
+        R_05 = T_05[:3, :3]
+        R_35 = np.dot(R_03.T, R_05)
+
+
 
         ########################################
 
+    def find_valid_ik_solution(self, angles_list: list):
+        """
+        Find valid solutions from list of multiple solutions from analytical ik calcultions
+        
+        Args:
+            angles_list: list of angles
+        """
+        
+        for i in range(len(angles_list)):
+            # Check joint limits
 
     def calc_numerical_ik(self, EE: EndEffector, tol=0.01, ilimit=50):
         """ Calculate numerical inverse kinematics based on input coordinates. """
