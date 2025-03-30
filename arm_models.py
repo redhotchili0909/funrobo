@@ -841,12 +841,11 @@ class FiveDOFRobot:
         for i in range(self.num_dof):
             T_05 = np.dot(T_05, self.T[i])
         
+        R_05 = T_05[:3, :3]
 
         # Find pwrist
         EE_pos = np.array([EE.x, EE.y, EE.z]).reshape(3, 1)
-
         vec = np.array([0, 0, 1]).reshape(3, 1)
-
         pwrist = EE_pos - ((self.l4 + self.l5) * np.dot(R_05, vec))
 
         # Declare endeffector position as the end point of pwrist
@@ -857,33 +856,42 @@ class FiveDOFRobot:
 
         # SOLVING FOR THETA 3
         L = np.sqrt(x**2 + y**2)
-        beta = np.arccos((L**2 -(self.l1**2 + self.l2**2)) / -(2 * self.l1 * self.l2))
+        beta = np.arccos(np.clip((L**2 -(self.l1**2 + self.l2**2)) / -(2 * self.l1 * self.l2), -1, 1))
         angle_3 = [-180-beta, 180-beta]
         self.theta[2] = self.find_valid_ik_solution(angle_3, 3)
-
-        # Computing analytical rotation matrix to compare with
-
         
         # SOLVING FOR THETA 2
         alpha = np.arctan(y/x)
         psi = np.arctan((self.l2 * np.sin(self.theta[1])) / self.l1 + self.l2*np.cos(self.theta[1]))
         angle_2 = [alpha - psi, alpha + psi]
-        self.theta[1] = self.find_valid_ik_solution(angle_2, 2)
-
+        self.theta[1] = -1 * self.find_valid_ik_solution(angle_2, 2)
 
         # SOLVING FOR THETA 1
         angle_1 = [np.pi + np.arctan(y / x), np.arctan(y / x)]
         self.theta[0] = self.find_valid_ik_solution(angle_1, 1)
 
 
-        #step 4
-        R_03 = 
+        # Denavit-Hartenberg parameters and transformation matrices
+        DH = np.zeros((3, 4))
+        H_03 = np.zeros((4,4))
+        # Set the Denavit-Hartenberg parameters for each joint
+        DH[0] = [self.theta[0], self.l1, 0, np.pi/2]
+        DH[1] = [self.theta[1] + np.pi/2, 0, self.l2, np.pi]
+        DH[2] = [self.theta[2], 0, self.l3, np.pi]
+        # self.DH[3] = [self.theta[3] - np.pi/2, 0, 0, -np.pi/2]
+        # self.DH[4] = [self.theta[4], self.l4 + self.l5, 0, 0]
 
-        # Extracting rotation matrix from total transformation matrix
-        R_05 = T_05[:3, :3]
+        # Compute the transformation matrices
+        for i in range(3):
+            H_03 = np.dot(H_03, dh_to_matrix(self.DH[i]))
+        # Extract rotation matrix
+        R_03 = H_03[:3, :3]
+        
         R_35 = np.dot(R_03.T, R_05)
-
-
+        
+        # SOLVING FOR THETA 4 and THETA 5
+        self.theta[3] = -1 * np.arctan2(R_35[0][2], R_35[1][2])
+        self.theta[4] = np.arctan2(R_35[2][0], R_35[2][1])
 
         ########################################
 
@@ -901,8 +909,8 @@ class FiveDOFRobot:
 
         for theta in angles_list:
             if theta >= min and theta <= max:
-                return theta
-
+                return theta.item()
+        return 0
 
     def calc_numerical_ik(self, EE: EndEffector, tol=0.01, ilimit=50):
         """ Calculate numerical inverse kinematics based on input coordinates. """
