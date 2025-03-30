@@ -837,7 +837,7 @@ class FiveDOFRobot:
         self.calc_forward_kinematics(self.theta, radians=True)
 
         # Find total transformation matrix from frame 0 to frame 5
-        T_05 = np.zeros((4, 4))
+        T_05 = np.eye(4, 4)
         for i in range(self.num_dof):
             T_05 = np.dot(T_05, self.T[i])
         
@@ -873,7 +873,7 @@ class FiveDOFRobot:
 
         # Denavit-Hartenberg parameters and transformation matrices
         DH = np.zeros((3, 4))
-        H_03 = np.zeros((4,4))
+        H_03 = np.eye(4,4)
         # Set the Denavit-Hartenberg parameters for each joint
         DH[0] = [self.theta[0], self.l1, 0, np.pi/2]
         DH[1] = [self.theta[1] + np.pi/2, 0, self.l2, np.pi]
@@ -885,13 +885,20 @@ class FiveDOFRobot:
         for i in range(3):
             H_03 = np.dot(H_03, dh_to_matrix(self.DH[i]))
         # Extract rotation matrix
+        # print(f"H_03 is: {H_03}")
         R_03 = H_03[:3, :3]
         
+        # print(f"R_05 is: {R_05}")
         R_35 = np.dot(R_03.T, R_05)
+        print(f"R_35 is: {R_35}")
         
         # SOLVING FOR THETA 4 and THETA 5
-        self.theta[3] = -1 * np.arctan2(R_35[0][2], R_35[1][2])
+        self.theta[3] = np.arctan2(R_35[0][2], -1*R_35[1][2])
+        print(f"theta 4 is {self.theta[3]}")
         self.theta[4] = np.arctan2(R_35[2][0], R_35[2][1])
+
+        self.calc_robot_points()
+        print(f"the position of the endeffector is: {EE.x, EE.y, EE.z}")
 
         ########################################
 
