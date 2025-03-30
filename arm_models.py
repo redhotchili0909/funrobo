@@ -855,35 +855,28 @@ class FiveDOFRobot:
         z = pwrist[2]
 
 
-
         # SOLVING FOR THETA 3
         L = np.sqrt(x**2 + y**2)
         beta = np.arccos((L**2 -(self.l1**2 + self.l2**2)) / -(2 * self.l1 * self.l2))
-
         angle_3 = [-180-beta, 180-beta]
-        # some math
-        self.theta[2] = 
+        self.theta[2] = self.find_valid_ik_solution(angle_3, 3)
 
         # Computing analytical rotation matrix to compare with
 
-
-
+        
         # SOLVING FOR THETA 2
         alpha = np.arctan(y/x)
         psi = np.arctan((self.l2 * np.sin(self.theta[1])) / self.l1 + self.l2*np.cos(self.theta[1]))
-
         angle_2 = [alpha - psi, alpha + psi]
-        #some math
-        self.theta[1] = alpha - psi
+        self.theta[1] = self.find_valid_ik_solution(angle_2, 2)
 
 
         # SOLVING FOR THETA 1
         angle_1 = [np.pi + np.arctan(y / x), np.arctan(y / x)]
-        #some math
-        self.theta[0] = 
+        self.theta[0] = self.find_valid_ik_solution(angle_1, 1)
 
 
-        #stpe 4
+        #step 4
         R_03 = 
 
         # Extracting rotation matrix from total transformation matrix
@@ -894,16 +887,22 @@ class FiveDOFRobot:
 
         ########################################
 
-    def find_valid_ik_solution(self, angles_list: list):
+    def find_valid_ik_solution(self, angles_list: list, angle_num):
         """
         Find valid solutions from list of multiple solutions from analytical ik calcultions
         
         Args:
             angles_list: list of angles
+            angle_num: int
+        Returns:
+            theta
         """
-        
-        for i in range(len(angles_list)):
-            # Check joint limits
+        min, max = self.theta_limits[angle_num-1]
+
+        for theta in angles_list:
+            if theta >= min and theta <= max:
+                return theta
+
 
     def calc_numerical_ik(self, EE: EndEffector, tol=0.01, ilimit=50):
         """ Calculate numerical inverse kinematics based on input coordinates. """
