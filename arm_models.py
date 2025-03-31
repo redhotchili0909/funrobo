@@ -833,15 +833,14 @@ class FiveDOFRobot:
         """
         ########################################
         # ANALYTICAL SOLUTION
-
-        self.calc_forward_kinematics(self.theta, radians=True)
-
-        # Find total transformation matrix from frame 0 to frame 5
-        T_05 = np.eye(4, 4)
-        for i in range(self.num_dof):
-            T_05 = np.dot(T_05, self.T[i])
         
-        R_05 = T_05[:3, :3]
+        # Find total transformation matrix from frame 0 to frame 5
+        H_05 = np.eye(4, 4)
+        H_05[:3, :3] = euler_to_rotm((EE.rotx, EE.roty, EE.rotz))
+        H_05[:3, 3] = np.array([EE.x, EE.y, EE.z])
+
+        R_05 = H_05[:3, :3]
+
 
         # Find pwrist
         EE_pos = np.array([EE.x, EE.y, EE.z]).reshape(3, 1)
@@ -856,7 +855,8 @@ class FiveDOFRobot:
 
         # SOLVING FOR THETA 3
         L = np.sqrt(x**2 + y**2)
-        beta = np.arccos(np.clip((L**2 -(self.l1**2 + self.l2**2)) / -(2 * self.l1 * self.l2), -1, 1))
+        tolerance =  1e-6
+        beta = np.arccos(np.clip((L**2 -(self.l1**2 + self.l2**2)) / -(2 * self.l1 * self.l2), -1 + tolerance, 1 - tolerance))
         angle_3 = [-180-beta, 180-beta]
         self.theta[2] = self.find_valid_ik_solution(angle_3, 3)
         
@@ -916,7 +916,7 @@ class FiveDOFRobot:
 
         for theta in angles_list:
             if theta >= min and theta <= max:
-                return theta.item()
+                return np.round(theta.item(), decimals=2)
         return 0
 
     def calc_numerical_ik(self, EE: EndEffector, tol=0.01, ilimit=50):
