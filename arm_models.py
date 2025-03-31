@@ -833,20 +833,18 @@ class FiveDOFRobot:
         """
         ########################################
         # ANALYTICAL SOLUTION
-
-        self.calc_forward_kinematics(self.theta, radians=True)
-
-        # Find total transformation matrix from frame 0 to frame 5
-        T_05 = np.zeros((4, 4))
-        for i in range(self.num_dof):
-            T_05 = np.dot(T_05, self.T[i])
         
+        # Find total transformation matrix from frame 0 to frame 5
+        H_05 = np.eye(4, 4)
+        H_05[:3, :3] = euler_to_rotm((EE.rotx, EE.roty, EE.rotz))
+        H_05[:3, 3] = np.array([EE.x, EE.y, EE.z])
+
+        R_05 = H_05[:3, :3]
+
 
         # Find pwrist
         EE_pos = np.array([EE.x, EE.y, EE.z]).reshape(3, 1)
-
         vec = np.array([0, 0, 1]).reshape(3, 1)
-
         pwrist = EE_pos - ((self.l4 + self.l5) * np.dot(R_05, vec))
 
         # Declare endeffector position as the end point of pwrist
@@ -855,55 +853,71 @@ class FiveDOFRobot:
         z = pwrist[2]
 
 
-
         # SOLVING FOR THETA 3
         L = np.sqrt(x**2 + y**2)
-        beta = np.arccos((L**2 -(self.l1**2 + self.l2**2)) / -(2 * self.l1 * self.l2))
-
+        tolerance =  1e-6
+        beta = np.arccos(np.clip((L**2 -(self.l1**2 + self.l2**2)) / -(2 * self.l1 * self.l2), -1 + tolerance, 1 - tolerance))
         angle_3 = [-180-beta, 180-beta]
-        # some math
-        self.theta[2] = 
-
-        # Computing analytical rotation matrix to compare with
-
-
-
+        self.theta[2] = self.find_valid_ik_solution(angle_3, 3)
+        
         # SOLVING FOR THETA 2
         alpha = np.arctan(y/x)
         psi = np.arctan((self.l2 * np.sin(self.theta[1])) / self.l1 + self.l2*np.cos(self.theta[1]))
-
         angle_2 = [alpha - psi, alpha + psi]
-        #some math
-        self.theta[1] = alpha - psi
-
+        self.theta[1] = -1 * self.find_valid_ik_solution(angle_2, 2)
 
         # SOLVING FOR THETA 1
         angle_1 = [np.pi + np.arctan(y / x), np.arctan(y / x)]
-        #some math
-        self.theta[0] = 
+        self.theta[0] = self.find_valid_ik_solution(angle_1, 1)
 
 
-        #stpe 4
-        R_03 = 
+        # Denavit-Hartenberg parameters and transformation matrices
+        DH = np.zeros((3, 4))
+        H_03 = np.eye(4,4)
+        # Set the Denavit-Hartenberg parameters for each joint
+        DH[0] = [self.theta[0], self.l1, 0, np.pi/2]
+        DH[1] = [self.theta[1] + np.pi/2, 0, self.l2, np.pi]
+        DH[2] = [self.theta[2], 0, self.l3, np.pi]
+        # self.DH[3] = [self.theta[3] - np.pi/2, 0, 0, -np.pi/2]
+        # self.DH[4] = [self.theta[4], self.l4 + self.l5, 0, 0]
 
-        # Extracting rotation matrix from total transformation matrix
-        R_05 = T_05[:3, :3]
+        # Compute the transformation matrices
+        for i in range(3):
+            H_03 = np.dot(H_03, dh_to_matrix(self.DH[i]))
+        # Extract rotation matrix
+        # print(f"H_03 is: {H_03}")
+        R_03 = H_03[:3, :3]
+        
+        # print(f"R_05 is: {R_05}")
         R_35 = np.dot(R_03.T, R_05)
+        print(f"R_35 is: {R_35}")
+        
+        # SOLVING FOR THETA 4 and THETA 5
+        self.theta[3] = np.arctan2(R_35[0][2], -1*R_35[1][2])
+        print(f"theta 4 is {self.theta[3]}")
+        self.theta[4] = np.arctan2(R_35[2][0], R_35[2][1])
 
-
+        self.calc_robot_points()
+        print(f"the position of the endeffector is: {EE.x, EE.y, EE.z}")
 
         ########################################
 
-    def find_valid_ik_solution(self, angles_list: list):
+    def find_valid_ik_solution(self, angles_list: list, angle_num):
         """
         Find valid solutions from list of multiple solutions from analytical ik calcultions
         
         Args:
             angles_list: list of angles
+            angle_num: int
+        Returns:
+            theta
         """
-        
-        for i in range(len(angles_list)):
-            # Check joint limits
+        min, max = self.theta_limits[angle_num-1]
+
+        for theta in angles_list:
+            if theta >= min and theta <= max:
+                return np.round(theta.item(), decimals=2)
+        return 0
 
     def calc_numerical_ik(self, EE: EndEffector, tol=0.01, ilimit=50):
         """ Calculate numerical inverse kinematics based on input coordinates. """
