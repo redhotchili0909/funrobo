@@ -12,55 +12,66 @@ def tm_solver(theta_init):
     theta_init: type=array; required. Initial guesses of theta
     """
     import math
+    import numpy as np
+    from numpy.linalg import multi_dot
+
+    l1 = 0.155
+    l2 = 0.099
+    l3 = 0.095
+    l4 = 0.055
+    l5 = 0.105
 
     # Declare variables storing the angle input values and values from the DH table
-    theta_0 = theta_init
-    t1 = theta_0[0]
-    t2 = theta_0[1]
-    t3 = theta_0[2]
-    t4 = theta_0[3]
-    t5 = theta_0[4]
-    l1 = 0.30
-    l2 = 0.15
-    l3 = 0.18
-    l4 = 0.15
-    l5 = 0.12
-    a2 = l2
-    a3 = l3
-    d1 = l1
-    d5 = l4 + l5
+    # DH parameters = [theta, d, a, alpha]
+    DH = np.zeros((5, 4))
+    DH[0] = [theta_init[0], l1, 0, math.pi / 2]
+    DH[1] = [theta_init[1] + math.pi / 2, 0, l2, math.pi]
+    DH[2] = [theta_init[2], 0, l3, math.pi]
+    DH[3] = [theta_init[3] - math.pi / 2, 0, 0, -math.pi / 2]
+    DH[4] = [theta_init[4], l4 + l5, 0, 0]
+
+    # Declare variables storing the angle input values and values from the DH table
+    theta = theta_init
+    d = [DH[0][1], DH[1][1], DH[2][1], DH[3][1], DH[4][1]]
+    a = [DH[0][2], DH[1][2], DH[2][2], DH[3][2], DH[4][2]]
+    alpha = [DH[0][3], DH[1][3], DH[2][3], DH[3][3], DH[4][3]]
+    num_matrices = 5  # Number of matrices in the array
+    rows, cols = 4, 4  # Dimensions of each matrix
+    matrix_array = np.array([np.zeros((rows, cols)) for _ in range(num_matrices)])
+    TM = matrix_array
 
     # Finding each component of the transformation matrix and substituting variables
-    n11 = math.cos(t1 + t2 + t3 + t4 + t5) + math.sin(t1 + t5)
-    n12 = -math.sin(t5) * math.cos(t1 + t2 + t3 + t4) + math.sin(t1) * math.cos(t5)
-    n13 = math.cos(t1) * math.sin(t2 + t3 + t4)
-    n14 = math.cos(t1) * (
-        d5 * math.sin(t2 + t3 + t4) + a3 * math.cos(t2 + t3) + a2 * math.cos(t2)
-    )
-    n21 = math.sin(t1) * math.cos(t2 + t3 + t4 + t5) - math.cos(t1) * math.sin(t5)
-    n22 = -math.sin(t1 + t5) * math.cos(t2 + t3 + t4) - math.cos(t1 + t5)
-    n23 = math.sin(t1) * math.sin(t2 + t3 + t4)
-    n24 = math.sin(t1) * (
-        d5 * math.sin(t2 + t3 + t4) + a3 * math.cos(t2 + t3) + a2 * math.cos(t2)
-    )
-    n31 = math.cos(t5) * math.sin(t2 + t3 + t4)
-    n32 = -math.sin(t5) * math.sin(t2 + t3 + t4)
-    n33 = -math.cos(t2 + t3 + t4)
-    n34 = -d5 * math.cos(t2 + t3 + t4) + a3 * math.sin(t2 + t3) + a2 * math.sin(t2) + d1
+    for y in range(len(theta)):
 
-    # Compiling the transformation matrix
-    TM = [
-        [n11, n21, n31, 0],
-        [n12, n22, n32, 0],
-        [n13, n23, n33, 0],
-        [n14, n24, n34, 1],
-    ]
+        n11 = np.cos(theta[y])
+        n12 = -np.sin(theta[y]) * np.cos(alpha[y])
+        n13 = np.sin(theta[y]) * np.sin(alpha[y])
+        n14 = a[y] * np.cos(theta[y])
 
+        n21 = np.sin(theta[y])
+        n22 = np.cos(theta[y]) * np.cos(alpha[y])
+        n23 = -np.cos(theta[y]) * np.sin(alpha[y])
+        n24 = a[y] * np.sin(theta[y])
+
+        n31 = 0
+        n32 = np.sin(alpha[y])
+        n33 = np.cos(alpha[y])
+        n34 = d[y]
+
+        # Compiling the transformation matrix
+        TM[y] = [
+            [n11, n21, n31, 0],
+            [n12, n22, n32, 0],
+            [n13, n23, n33, 0],
+            [n14, n24, n34, 1],
+        ]
+
+    Final_TM = multi_dot(TM)
     # Isolating the position outputs of the transformation matrix
-    Pos = [round(n14, 3), round(n24, 3), round(n34, 3)]
+    Pos = [round(Final_TM[3][0], 3), round(Final_TM[3][1], 3), round(Final_TM[3][2], 3)]
 
     # Return the matrix and the isolated position values
-    return [TM, Pos]
+    return [Final_TM, Pos]
 
 
 def inverse_jacobian(theta_init):
@@ -215,7 +226,7 @@ def inverse_jacobian(theta_init):
     return Jacobian_Linear
 
 
-def num_analysis(xd, theta_0, n):
+def num_analysis(xd, theta_init, n):
     """Finds the angle values for each joint of a robot given the desired end-effector position.
     For a given transformation matrix and desired end-effector position:
     - Defines a function g which quantifies the error in the EE(end-effector)
@@ -236,7 +247,7 @@ def num_analysis(xd, theta_0, n):
     xd: type=array; required.
     An array of the x, y, and z values of the desired end effector position.
 
-    theta_0: type=array; required. An array of initial angle value guessed.
+    theta_init: type=array; required. An array of initial angle value guessed.
 
     n: type=int; required.
     The max number of iterations that can be tried before the function gives up.
@@ -247,7 +258,7 @@ def num_analysis(xd, theta_0, n):
     rad2deg = float(180 / np.pi)
 
     # Initialize theta_i
-    theta_i = theta_0
+    theta_i = theta_init
 
     # Extract end-effector position
     ee_p = np.array(tm_solver(theta_i)[1])
@@ -289,32 +300,50 @@ def num_analysis(xd, theta_0, n):
 
             # End the function to prevent an endless loop
             break
+
     else:
-        # If the stopping criteria are met / the error is = 0
-        # Convert radians to degrees and round values
-        theta_deg = np.round(theta_i * rad2deg, 3)
-        print(
-            "The joint angles (in degrees) "
-            + str(theta_deg[0])
-            + ", "
-            + str(theta_deg[1])
-            + ", "
-            + str(theta_deg[2])
-            + ", "
-            + str(theta_deg[3])
-            + ", and "
-            + str(theta_deg[4])
-            + " satisfy the desired end-effector position."
-        )
-        print("It took " + str(i) + " iterations to find the angle values")
-        return np.round(theta_i, 3)
+
+        theta_limits = [
+            [-np.pi, np.pi],
+            [-np.pi / 3, np.pi],
+            [-np.pi + np.pi / 12, np.pi - np.pi / 4],
+            [-np.pi + np.pi / 12, np.pi - np.pi / 12],
+            [-np.pi, np.pi],
+        ]
+
+        for y, theta_limit in enumerate(theta_limits):
+            if theta_i[y] < theta_limits[y][0] or theta_i[y] > theta_limits[y][1]:
+                print("This angle is out of the range of the joint limits")
+                break
+
+        if theta_i[y] < theta_limits[y][0] or theta_i[y] > theta_limits[y][1]:
+            pass
+        else:
+
+            theta_deg = np.round(theta_i * rad2deg, 3)
+            print(
+                "The joint angles (in degrees) "
+                + str(theta_deg[0])
+                + ", "
+                + str(theta_deg[1])
+                + ", "
+                + str(theta_deg[2])
+                + ", "
+                + str(theta_deg[3])
+                + ", and "
+                + str(theta_deg[4])
+                + " satisfy the desired end-effector position."
+            )
+            print("It took " + str(i) + " iterations to find the angle values")
+            return np.round(theta_i, 3)
 
 
 # Declare an array of initial angle guesses
 theta_inits = [0.4, 0.5, 0.6, 0.2, 0.1]
 
 # Declare an array including the desired end-effector position
-desired_eep = [0.7, 0.445, 0.264]
+desired_eep = [0.9, 0.445, 0.264]
 
 # Attempt to find the theta values that will result in the desired end-effector position
 theta_vals = num_analysis(desired_eep, theta_inits, 500)
+print(theta_vals)
