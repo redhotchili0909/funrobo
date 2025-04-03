@@ -1,7 +1,7 @@
 from math import sqrt, sin, cos, atan, atan2, degrees, pi
 import numpy as np
 from matplotlib.figure import Figure
-from helper_fcns.utils import EndEffector, rotm_to_euler, euler_to_rotm, check_joint_limits, dh_to_matrix, near_zero
+from helper_fcns.utils import EndEffector, rotm_to_euler, euler_to_rotm, check_joint_limits, dh_to_matrix, near_zero, wraptopi
 
 PI = 3.1415926535897932384
 # np.set_printoptions(precision=3)
@@ -85,7 +85,7 @@ class Robot:
             if not numerical:
                 self.robot.calc_inverse_kinematics(pose, soln=soln)
             else:
-                self.robot.calc_numerical_ik(pose, tol=0.02, ilimit=50)
+                self.robot.calc_numerical_ik(pose, tol=0.005, ilimit=150)
         elif angles is not None: # Forward kinematics case
             self.robot.calc_forward_kinematics(angles, radians=False)
         else:
@@ -339,27 +339,6 @@ class TwoDOFRobot():
             print("[ERROR] Joint limits exceeded (runtime issue).")
         
         # Calculate robot points based on the updated joint angles
-        self.calc_robot_points()
-
-
-    def calc_numerical_ik(self, EE: EndEffector, tol=0.01, ilimit=50):
-        """
-        Calculates numerical inverse kinematics (IK) based on input end effector coordinates.
-
-        Args:
-            EE (EndEffector): The end effector object containing the target position (x, y).
-            tol (float, optional): The tolerance for the solution. Defaults to 0.01.
-            ilimit (int, optional): The maximum number of iterations. Defaults to 50.
-        """
-        
-        x, y = EE.x, EE.y
-        
-        ########################################
-
-        # insert your code here
-
-        ########################################
-
         self.calc_robot_points()
 
 
@@ -823,7 +802,7 @@ class FiveDOFRobot:
         self.calc_robot_points()
 
 
-    def calc_inverse_kinematics(self, EE: EndEffector, soln):
+    def calc_inverse_kinematics(self, EE: EndEffector, soln=0):
         """
         Calculate inverse kinematics to determine the joint angles based on end-effector position.
         
@@ -838,7 +817,6 @@ class FiveDOFRobot:
         H_05 = np.eye(4, 4)
         H_05[:3, :3] = euler_to_rotm((EE.rotx, EE.roty, EE.rotz))
         H_05[:3, 3] = np.array([EE.x, EE.y, EE.z])
-        print("H_05 is:", H_05)
 
         R_05 = H_05[:3, :3]
 
@@ -849,54 +827,29 @@ class FiveDOFRobot:
         pwrist = EE_pos - ((self.l4 + self.l5) * np.dot(R_05, vec))
 
         # Declare endeffector position as the end point of pwrist
-        x = pwrist[0].item()
-        y = pwrist[1].item()
-        z = pwrist[2].item()
-        print("PWRIST POSTION IS:", x, y, z)
+        x = pwrist[0]
+        y = pwrist[1]
+        z = pwrist[2]
 
 
         # SOLVING FOR THETA 3
         L = np.sqrt(x**2 + y**2)
-        cosang3 = (L**2 - self.l1**2 - self.l2**2) / (2 * self.l1 * self.l2)
-        sinang3 = np.sqrt(1 - (cosang3**2))
-
-        ang3 = np.arctan2(sinang3, cosang3)  # One possible solution
-        angle_3 = [-180 + ang3, 180 - ang3]  # Two possible solutions
-        angle_3 = [((a + np.pi) % (2 * np.pi)) - np.pi for a in angle_3]
-        # Debugging print
-        print(f"Computed angles (degrees): {np.degrees(angle_3[0])}, {np.degrees(angle_3[1])}")
-
-
-        # self.theta[2] = self.find_valid_ik_solution(angle_3, 3, soln)
-        # self.theta[2] = ?
-        print("THETA3 IS:", np.rad2deg(self.theta[2]), "in radians is:", self.theta[2])
-        print(f"ANGLE 3 SOLUTIONS ARE: {np.rad2deg(angle_3)}")
+        tolerance =  1e-6
+        beta = np.arccos(np.clip((L**2 -(self.l1**2 + self.l2**2)) / -(2 * self.l1 * self.l2), -1 + tolerance, 1 - tolerance))
+        angle_3 = [-180-beta, 180-beta]
+        self.theta[2] = self.find_valid_ik_solution(angle_3, 3)
         
         # SOLVING FOR THETA 2
-        alpha = np.arctan2(y,x)
-        psi = np.arctan2((self.l3 * np.sin(self.theta[2])), (self.l2 + self.l3*np.cos(self.theta[2])))
-        # angle_2 = [alpha - psi, alpha + psi]
-        r = np.sqrt(x**2 + y**2)
-        s = z - self.l1
-        ang2 = np.arctan2(r, s)
-        # self.theta[1] = -1 * self.find_valid_ik_solution(angle_2, 2, soln)
-        # print("THETA2 IS:", self.theta[1])
-        print(f"ANGLE 2 SOLUTIONS ARE: {ang2}")
+        alpha = np.arctan(y/x)
+        psi = np.arctan((self.l2 * np.sin(self.theta[1])) / self.l1 + self.l2*np.cos(self.theta[1]))
+        angle_2 = [alpha - psi, alpha + psi]
+        self.theta[1] = -1 * self.find_valid_ik_solution(angle_2, 2)
 
         # SOLVING FOR THETA 1
-        angle_1 = [np.pi + np.arctan2(y, x), np.arctan2(y, x)]
-        # self.theta[0] = self.find_valid_ik_solution(angle_1, 1, soln)
-        # print("THETA1 IS:", self.theta[0])
-        print(f"ANGLE 1 SOLUTIONS ARE: {angle_1}")
+        angle_1 = [np.pi + np.arctan(y / x), np.arctan(y / x)]
+        self.theta[0] = self.find_valid_ik_solution(angle_1, 1)
 
-        # # Generate all combinations (8 possibilities)
-        # solutions = [(a1, a2, a3) for a1 in angle_1 for a2 in angle_2 for a3 in angle_3]
 
-        # # Print all solutions
-        # for i, sol in enumerate(solutions):
-        #     # print(f"Solution {i+1}: theta_1 = {sol[0]}, theta_2 = {sol[1]}, theta_3 = {sol[2]}")
-        #     print(f"Solution {i+1}: theta_1 = {np.rad2deg(sol[0])}, theta_2 = {np.rad2deg(sol[1])}, theta_3 = {np.rad2deg(sol[2])}")
-        
         # Denavit-Hartenberg parameters and transformation matrices
         DH = np.zeros((3, 4))
         H_03 = np.eye(4,4)
@@ -909,30 +862,26 @@ class FiveDOFRobot:
 
         # Compute the transformation matrices
         for i in range(3):
-            H_03 = H_03 @ dh_to_matrix(self.DH[i])
-
+            H_03 = np.dot(H_03, dh_to_matrix(self.DH[i]))
         # Extract rotation matrix
+        # print(f"H_03 is: {H_03}")
         R_03 = H_03[:3, :3]
-        R_35 = R_03.T @ R_05
+        
+        # print(f"R_05 is: {R_05}")
+        R_35 = np.dot(R_03.T, R_05)
+        print(f"R_35 is: {R_35}")
         
         # SOLVING FOR THETA 4 and THETA 5
-        # self.theta[3] = np.arctan2(R_35[1][2], R_35[0][2])
-        # self.theta[4] = np.arctan2(R_35[2][0], R_35[2][1])
-
-        self.theta[3] = np.arctan2(R_35[1][2], R_35[0][2])  # theta_3
-        # print(f"theta 3 is {self.theta[3]}")
-
-        self.theta[4] = np.arctan2(-R_35[2][0], -R_35[2][1])  # theta_4
-        # print(f"theta 4 is {self.theta[4]}")
+        self.theta[3] = np.arctan2(R_35[0][2], -1*R_35[1][2])
+        print(f"theta 4 is {self.theta[3]}")
+        self.theta[4] = np.arctan2(R_35[2][0], R_35[2][1])
 
         self.calc_robot_points()
-        # return self.calc_forward_kinematics(best_solution, radians=True)
         print(f"the position of the endeffector is: {EE.x, EE.y, EE.z}")
-        print(f"THE JOINT ANGLES ARE: {self.theta}")
 
         ########################################
 
-    def find_valid_ik_solution(self, angles_list: list, angle_num, soln):
+    def find_valid_ik_solution(self, angles_list: list, angle_num):
         """
         Find valid solutions from list of multiple solutions from analytical ik calcultions
         
@@ -946,59 +895,56 @@ class FiveDOFRobot:
 
         for theta in angles_list:
             if theta >= min and theta <= max:
-                angles_list.remove(theta)
-                # return np.round(theta.item(), decimals=2)
-        # return 0
-        if len(angles_list) > 1:
-            if soln == 1:
-                return angles_list[1].item()    
-        return angles_list[0].item()
-            
-    
+                return np.round(theta.item(), decimals=2)
+        return 0
+     
 
     def calc_numerical_ik(self, EE: EndEffector, tol=0.01, ilimit=50):
-        """ Calculate numerical inverse kinematics based on input coordinates. """
-        
-        ########################################
-
-        # insert your code here
-
-        ########################################
-        self.calc_forward_kinematics(self.theta, radians=True)
-
-
-    def calc_velocity_kinematics(self, vel: list):
         """
-        Calculate the joint velocities required to achieve the given end-effector velocity.
-        
+        Calculate numerical inverse kinematics (IK) to move the robot's end-effector 
+        to the desired position (EE.x, EE.y, EE.z).
+
         Args:
-            vel: Desired end-effector velocity (3x1 vector).
+            EE (EndEffector): desired end-effector pose (x, y, z).
+            tol (float): position error tolerance in meters.
+            ilimit (int): max number of iterations before giving up.
         """
-        # Avoid singularity by perturbing joint angles slightly
-        if all(th == 0.0 for th in self.theta):
-            self.theta = [th + np.random.rand() * 0.01 for th in self.theta]
 
-        # Calculate the joint velocity using the inverse Jacobian
-        # thetadot = self.inverse_jacobian(pseudo=True) @ vel
-        thetadot = self.damped_inverse_jacobian() @ vel
+        print("Start Numerical IK!")
+        xd = np.array([EE.x, EE.y, EE.z])       # desired [x, y, z]
 
-        # (Corrective measure) Ensure joint velocities stay within limits
-        thetadot = np.clip(thetadot, [limit[0] for limit in self.thetadot_limits], [limit[1] for limit in self.thetadot_limits])
+        # Copy the current joint angles
+        theta_i = np.array(self.theta, dtype=float)
 
-        # Update joint angles
-        self.theta[0] += 0.02 * thetadot[0]
-        self.theta[1] += 0.02 * thetadot[1]
-        self.theta[2] += 0.02 * thetadot[2]
-        self.theta[3] += 0.02 * thetadot[3]
-        self.theta[4] += 0.02 * thetadot[4]
+        for i in range(ilimit):
+            # 1) Update self.theta and run forward kinematics
+            self.theta = theta_i.tolist()
+            self.calc_forward_kinematics(self.theta, radians=True)
+        
+            # 2) Compute the current error = desired - actual
+            current_xyz = np.array([self.ee.x, self.ee.y, self.ee.z])
+            g = xd - current_xyz
 
-        # print(f'linear vel: {[round(vel[0], 3), round(vel[1], 3), round(vel[2], 3)]}')
-        # print(f'thetadot (deg/s) = {[round(td,2) for td in thetadot]}')
-        # print(f'Commanded theta (deg) = {[round(th,2) for th in self.theta]}')  
+            # 3) Check if the norm of error is below tolerance
+            if np.linalg.norm(g) < tol:
+                print(f"Converged in {i} iterations.")
+                print("Final joint angles (deg) =", np.round(np.degrees(theta_i), 3))
+                print("Final end-effector position =", [round(v, 4) for v in current_xyz])
+                return
 
-        # Recompute robot points based on updated joint angles
-        self.calc_forward_kinematics(self.theta, radians=True)
+            # 4) Compute Jacobian at this configuration, get pseudoinverse
+            J = self.jacobian(theta_i)
 
+            J_pinv = np.linalg.pinv(J)
+
+            # 5) Update rule: theta_{k+1} = theta_k + J⁺ @ (xd - x_current)
+            theta_i = theta_i + J_pinv @ g
+
+            for idx in range(self.num_dof):
+                low, high = self.theta_limits[idx]
+                theta_i[idx] = np.clip(theta_i[idx], low, high)
+
+        print("No numerical solution found within iteration limit.")
 
     def jacobian(self, theta: list = None):
         """
