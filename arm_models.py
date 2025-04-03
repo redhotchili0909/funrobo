@@ -223,6 +223,9 @@ class Robot:
         for i in range(self.num_joints):
             theta_text += f" {round(np.rad2deg(self.robot.theta[i]),2)}, "
         theta_text += " ]"
+
+        print(theta_text)
+        print(pose_text)
         
         textstr = pose_text + "\n" + theta_text
         self.sub1.text2D(0.2, 0.02, textstr, fontsize=13, transform=self.fig.transFigure)
