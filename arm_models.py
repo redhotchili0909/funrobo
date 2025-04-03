@@ -756,7 +756,7 @@ class FiveDOFRobot:
         """Initialize the robot parameters and joint limits."""
         # Link lengths
         # self.l1, self.l2, self.l3, self.l4, self.l5 = 0.30, 0.15, 0.18, 0.15, 0.12
-        self.l1, self.l2, self.l3, self.l4, self.l5 = 0.155, 0.099, 0.095, 0.055, 0.105 # from hardware measurements
+        self.l1, self.l2, self.l3, self.l4, self.l5 = 0.155, 0.099, 0.095, 0.055, (0.105 - 0.16) # from hardware measurements
         
         # Joint angles (initialized to zero)
         self.theta = [0, 0, 0, 0, 0]
@@ -834,25 +834,21 @@ class FiveDOFRobot:
         ########################################
         # ANALYTICAL SOLUTION
         
-        # Find total transformation matrix from frame 0 to frame 5
-        H_05 = np.eye(4, 4)
-        H_05[:3, :3] = euler_to_rotm((EE.rotx, EE.roty, EE.rotz))
-        H_05[:3, 3] = np.array([EE.x, EE.y, EE.z])
-        print("H_05 is:", H_05)
-
-        R_05 = H_05[:3, :3]
-
+        # Find rotation matrix from with euler angles
+        R_05 = euler_to_rotm((EE.rotx, EE.roty, EE.rotz))
 
         # Find pwrist
         EE_pos = np.array([EE.x, EE.y, EE.z]).reshape(3, 1)
         vec = np.array([0, 0, 1]).reshape(3, 1)
-        pwrist = EE_pos - ((self.l4 + self.l5) * np.dot(R_05, vec))
+        pwrist = EE_pos - ((self.l4 + self.l5) * (R_05 @ vec))
 
         # Declare endeffector position as the end point of pwrist
         x = pwrist[0].item()
         y = pwrist[1].item()
         z = pwrist[2].item()
-        print("PWRIST POSTION IS:", x, y, z)
+        print("THE WRIST POSITION IS:", x,y,z)
+
+
 
 
         # SOLVING FOR THETA 3
@@ -860,43 +856,42 @@ class FiveDOFRobot:
         cosang3 = (L**2 - self.l1**2 - self.l2**2) / (2 * self.l1 * self.l2)
         sinang3 = np.sqrt(1 - (cosang3**2))
 
-        ang3 = np.arctan2(sinang3, cosang3)  # One possible solution
-        angle_3 = [-180 + ang3, 180 - ang3]  # Two possible solutions
-        angle_3 = [((a + np.pi) % (2 * np.pi)) - np.pi for a in angle_3]
-        # Debugging print
-        print(f"Computed angles (degrees): {np.degrees(angle_3[0])}, {np.degrees(angle_3[1])}")
+        angle_3 = [np.arctan2(sinang3, cosang3), np.arctan2(-sinang3, cosang3)]  # One possible solution
 
+        # Two possible solitions
+        # angle_3_rad = [np.rad2deg(-np.pi + ang3), np.rad2deg(np.pi + ang3)]  # Two possible solutions
+        # angle_3_deg = [-180 + float(ang3), 180 - float(ang3)] 
 
-        # self.theta[2] = self.find_valid_ik_solution(angle_3, 3, soln)
-        # self.theta[2] = ?
-        print("THETA3 IS:", np.rad2deg(self.theta[2]), "in radians is:", self.theta[2])
-        print(f"ANGLE 3 SOLUTIONS ARE: {np.rad2deg(angle_3)}")
+        print("THETA THREE SOLUTIONS", angle_3)
+        self.theta[2] = angle_3[0]
+
         
         # SOLVING FOR THETA 2
         alpha = np.arctan2(y,x)
-        psi = np.arctan2((self.l3 * np.sin(self.theta[2])), (self.l2 + self.l3*np.cos(self.theta[2])))
-        # angle_2 = [alpha - psi, alpha + psi]
+        psi = float(np.arctan2((self.l3 * np.sin(-self.theta[2])), (self.l2 + self.l3*np.cos(-self.theta[2]))))
+        angle_2 = [alpha - psi, alpha + psi]
+        print("THE DIFFERNT (ANGLE_2 VAR) THETA 2s ARE:", angle_2)
+
+
         r = np.sqrt(x**2 + y**2)
         s = z - self.l1
         ang2 = np.arctan2(r, s)
-        # self.theta[1] = -1 * self.find_valid_ik_solution(angle_2, 2, soln)
-        # print("THETA2 IS:", self.theta[1])
-        print(f"ANGLE 2 SOLUTIONS ARE: {ang2}")
+        self.theta[1] = ang2
+        print("AASINIGN THETA 2 AS:", np.rad2deg(self.theta[1]), "IN RADIANS AS:", self.theta[1])
+        
+
+
 
         # SOLVING FOR THETA 1
         angle_1 = [np.pi + np.arctan2(y, x), np.arctan2(y, x)]
         # self.theta[0] = self.find_valid_ik_solution(angle_1, 1, soln)
         # print("THETA1 IS:", self.theta[0])
-        print(f"ANGLE 1 SOLUTIONS ARE: {angle_1}")
-
-        # # Generate all combinations (8 possibilities)
-        # solutions = [(a1, a2, a3) for a1 in angle_1 for a2 in angle_2 for a3 in angle_3]
-
-        # # Print all solutions
-        # for i, sol in enumerate(solutions):
-        #     # print(f"Solution {i+1}: theta_1 = {sol[0]}, theta_2 = {sol[1]}, theta_3 = {sol[2]}")
-        #     print(f"Solution {i+1}: theta_1 = {np.rad2deg(sol[0])}, theta_2 = {np.rad2deg(sol[1])}, theta_3 = {np.rad2deg(sol[2])}")
+        print(f"ANGLE 1 SOLUTIONS ARE: {np.rad2deg(angle_1)}")
         
+
+
+
+
         # Denavit-Hartenberg parameters and transformation matrices
         DH = np.zeros((3, 4))
         H_03 = np.eye(4,4)
@@ -914,20 +909,10 @@ class FiveDOFRobot:
         # Extract rotation matrix
         R_03 = H_03[:3, :3]
         R_35 = R_03.T @ R_05
-        
-        # SOLVING FOR THETA 4 and THETA 5
-        # self.theta[3] = np.arctan2(R_35[1][2], R_35[0][2])
-        # self.theta[4] = np.arctan2(R_35[2][0], R_35[2][1])
 
-        self.theta[3] = np.arctan2(R_35[1][2], R_35[0][2])  # theta_3
-        # print(f"theta 3 is {self.theta[3]}")
+        self.theta[3] = np.arctan2(R_35[1][2], R_35[0][2])  # theta 4
+        self.theta[4] = np.arctan2(-R_35[2][0], -R_35[2][1])  # theta 5
 
-        self.theta[4] = np.arctan2(-R_35[2][0], -R_35[2][1])  # theta_4
-        # print(f"theta 4 is {self.theta[4]}")
-
-        self.calc_robot_points()
-        # return self.calc_forward_kinematics(best_solution, radians=True)
-        print(f"the position of the endeffector is: {EE.x, EE.y, EE.z}")
         print(f"THE JOINT ANGLES ARE: {self.theta}")
 
         ########################################
