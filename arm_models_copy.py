@@ -635,7 +635,7 @@ class FiveDOFRobot:
         # Angle 1
         self.theta[0] = np.arctan(y / x)
         # Multiple Solutions
-        self.theta[0] = [np.pi + np.arctan(y / x), np.arctan(y / x)]
+        # self.theta[0] = [np.pi + np.arctan(y / x), np.arctan(y / x)]
 
 
         # STEP 3
