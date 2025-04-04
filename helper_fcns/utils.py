@@ -255,3 +255,14 @@ def near_zero(arr: np.ndarray) -> np.ndarray:
     """
     tol = 1e-6
     return np.where(np.isclose(arr, 0, atol=tol), 0, arr)
+
+def wraptopi(angle_rad):
+  """Wraps an angle in radians to the range [-pi, pi).
+
+  Args:
+    angle_rad: The angle in radians.
+
+  Returns:
+    The wrapped angle in radians.
+  """
+  return (angle_rad + math.pi) % (2 * math.pi) - math.pi
