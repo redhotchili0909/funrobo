@@ -6,6 +6,51 @@ This repository accompanies the class activities in modules 1&2 focusing on the 
 3. **Inverse position kinematics (IPK)**
 4. Applied on three different arm configurations: **Two-DOF arm, SCARA robot, 5-DOF Hiwonder robot**
 
+
+# MP2 Implementation - Inverse Kinematics
+
+![MP2 Inverse Kinematics](/MP2.gif)
+
+## Funrobo MP2: Inverse Kinematics of a 5-DOF Robotic Arm
+
+This repository contains a simulation project implementing inverse kinematics (IK) for a 5-DOF robotic arm. Two IK approaches are provided:
+
+- **Analytical IK:** Uses closed-form geometric derivations to compute candidate solutions.
+- **Numerical IK:** Utilizes a Newton-Raphson iterative method based on the Jacobian to refine joint angles.
+
+The simulation verifies each candidate solution by applying forward kinematics and checking for validity (i.e., adherence to joint limits and minimal positional error).
+
+## Features
+
+- **Analytical Inverse Kinematics:**  
+  - Computes the wrist center based on the desired end-effector position.
+  - Derives closed-form solutions for the first three joints using geometric relationships and the law of cosines.
+  - Generates 16 candidate solutions for the 5-DOF arm.
+  - Filters out solutions that violate joint limits.
+  - Validates the remaining candidates using forward kinematics and selects the one with the smallest positional error.
+
+- **Numerical Inverse Kinematics:**  
+  - Implements an iterative approach using the Jacobian pseudoinverse.
+  - Refines the initial guess for joint angles until the positional error is below a specified tolerance.
+  - Enforces joint limits throughout the iterative process.
+
+- **Simulation & Visualization:**  
+  - Provides detailed logging of computation times, candidate solution filtering, and convergence details.
+  - Includes simulation videos (linked in the report) for both the analytical and numerical methods.
+
+
+## Usage
+
+To run the simulation for the 5-DOF robotic arm, execute:
+```bash
+python3 main_arm.py --robot_type 5-dof
+```
+
+This command starts the simulation, which will:
+- Compute candidate IK solutions (both analytical and numerical).
+- Filter and validate solutions based on joint limits and positional accuracy.
+- Output the best solution along with detailed logs on computation time and positional error.
+
 This repository provides the **visualization tool (viz tool)** for testing your kinematics modeling and analysis code.
 
 ## Viz Tool
