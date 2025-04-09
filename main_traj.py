@@ -4,7 +4,7 @@ from modules.trajectory_generator import *
 def main():
     """Main function that runs the simulation"""
 
-    traj = MultiAxisTrajectoryGenerator(method="cubic",
+    traj = MultiAxisTrajectoryGenerator(method="trapezoid",
                                         interval=[0,10],
                                         ndof=1,
                                         start_pos=[-30],

@@ -5,10 +5,7 @@ from helper_fcns.utils import EndEffector, rotm_to_euler, euler_to_rotm, check_j
 import time
 
 PI = 3.1415926535897932384
-<<<<<<< HEAD:arm_models.py
 # np.set_printoptions(precision=3)
-=======
->>>>>>> upstream/main:modules/arm_models.py
 
 class Robot:
     """
@@ -57,10 +54,7 @@ class Robot:
         self.point_x, self.point_y, self.point_z = [], [], []
         self.waypoint_x, self.waypoint_y, self.waypoint_z = [], [], []
         self.waypoint_rotx, self.waypoint_roty, self.waypoint_rotz = [], [], []
-<<<<<<< HEAD:arm_models.py
-=======
         self.theta_traj = [] # stored trajectory
->>>>>>> upstream/main:modules/arm_models.py
         self.show_animation = show_animation
         self.plot_limits = [0.65, 0.65, 0.8]
 
@@ -93,11 +87,7 @@ class Robot:
             if not numerical:
                 self.robot.calc_inverse_kinematics(pose, soln=soln)
             else:
-<<<<<<< HEAD:arm_models.py
-                self.robot.calc_numerical_ik(pose, tol=0.005, ilimit=1500)
-=======
                 self.robot.calc_numerical_ik(pose)
->>>>>>> upstream/main:modules/arm_models.py
         elif angles is not None: # Forward kinematics case
             self.robot.calc_forward_kinematics(angles, radians=False)
         else:
@@ -168,8 +158,6 @@ class Robot:
         self.sub1.plot(self.waypoint_x, self.waypoint_y, self.waypoint_z, 'or', markersize=8)
 
 
-<<<<<<< HEAD:arm_models.py
-=======
     def plot_ee_trajectory(self):
         """TBA
         """
@@ -197,7 +185,6 @@ class Robot:
         return self.robot.solve_inverse_kinematics(pose)
     
 
->>>>>>> upstream/main:modules/arm_models.py
     def update_waypoints(self, waypoints: list):
         """
         Updates the waypoints into a member variable
@@ -211,8 +198,6 @@ class Robot:
             # self.waypoint_rotz.append(waypoints[i][5])
 
 
-<<<<<<< HEAD:arm_models.py
-=======
     def get_waypoints(self):
         return [
             [self.waypoint_x[0], self.waypoint_y[0], self.waypoint_z[0]],
@@ -220,7 +205,6 @@ class Robot:
         ]
     
 
->>>>>>> upstream/main:modules/arm_models.py
     def plot_3D(self):
         """
         Plots the 3D visualization of the robot, including the robot's links, end-effector, and reference frames.
@@ -243,19 +227,12 @@ class Robot:
             self.point_z.append(float(self.robot.points[i][2]))
         self.sub1.plot(self.point_x, self.point_y, self.point_z, marker='o', markerfacecolor='m', markersize=12)
 
-<<<<<<< HEAD:arm_models.py
-
-        # draw the waypoints
-        self.plot_waypoints()
-
-=======
         # draw the waypoints
         self.plot_waypoints()
 
         # draw the EE trajectory
         self.plot_ee_trajectory()
 
->>>>>>> upstream/main:modules/arm_models.py
         # draw the EE
         self.sub1.plot(EE.x, EE.y, EE.z, 'bo')
         # draw the base reference frame
@@ -295,8 +272,6 @@ class Robot:
         self.sub1.set_zlim(0, self.plot_limits[2])
         self.sub1.set_xlabel('x [m]')
         self.sub1.set_ylabel('y [m]')
-
-
 
 
 class TwoDOFRobot():
@@ -798,12 +773,7 @@ class FiveDOFRobot:
     def __init__(self):
         """Initialize the robot parameters and joint limits."""
         # Link lengths
-<<<<<<< HEAD:arm_models.py
         self.l1, self.l2, self.l3, self.l4, self.l5 = 0.155, 0.099, 0.095, 0.055, (0.105 - 0.16) # from hardware measurements
-=======
-        # self.l1, self.l2, self.l3, self.l4, self.l5 = 0.30, 0.15, 0.18, 0.15, 0.12
-        self.l1, self.l2, self.l3, self.l4, self.l5 = 0.155, 0.099, 0.095, 0.055, 0.105 # from hardware measurements
->>>>>>> upstream/main:modules/arm_models.py
         
         # Joint angles (initialized to zero)
         self.theta = [0, 0, 0, 0, 0]

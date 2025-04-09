@@ -209,13 +209,144 @@ class QuinticPolynomial():
     """
 
     def __init__(self, trajgen):
-        pass
+        self._copy_params(trajgen)
+        self.solve()
+
+    def _copy_params(self, trajgen):
+        self.start_pos = trajgen.start_pos
+        self.start_vel = trajgen.start_vel
+        self.start_acc = trajgen.start_acc
+        self.final_pos = trajgen.final_pos
+        self.final_vel = trajgen.final_vel
+        self.final_acc = trajgen.final_acc
+        self.T = trajgen.T
+        self.ndof = trajgen.ndof
+        self.X = [None] * self.ndof
+    
+    def solve(self):
+        t0, tf = 0, self.T
+        self.A = np.array(
+                [[1, t0, t0**2, t0**3, t0**4, t0**5],
+                [0, 1, 2*t0, 3*t0**2, 4*t0**3, 5*t0**4],
+                [0, 0, 2, 6*t0, 12*t0**2, 20*t0**3],
+                [1, tf, tf**2, tf**3, tf**4, tf**5],
+                [0, 1, 2*tf, 3*tf**2, 4*tf**3, 5*tf**4],
+                [0, 0, 2, 6*tf, 12*tf**2, 20*tf**3],
+                ])
+        
+        self.b = np.zeros([6, self.ndof])
+
+        for i in range(self.ndof):
+            self.b[:, i] = [self.start_pos[i], self.start_vel[i], self.start_acc[i],
+                            self.final_pos[i], self.final_vel[i], self.final_acc[i]]
+
+        self.coeff = np.linalg.solve(self.A, self.b)
+
+    def generate(self, nsteps=100):
+        self.t = np.linspace(0, self.T, nsteps)
+
+        for i in range(self.ndof): # iterate through all DOFs
+            q, qd, qdd = [], [], []
+            c = self.coeff[:,i]
+            for t in self.t: # iterate through time, t
+                q.append(c[0] + c[1] * t + c[2] * t**2 + c[3] * t**3 + c[4] * t**4 + c[5] * t**5)
+                qd.append(c[1] + 2 * c[2] * t + 3 * c[3] * t**2 + 4 * c[4] * t**3 + 5 * c[5] * t**4)
+                qdd.append(2 * c[2] + 6 * c[3] * t + 12 * c[4] * t**2 + 20 * c[5] * t**3)    
+            self.X[i] = [q, qd, qdd]
+        return self.X
+    
 
 
 class TrapezoidVelocity():
     """
     Trapezoidal velocity profile generator for constant acceleration/deceleration phases.
     """
-    
+
     def __init__(self, trajgen):
-        pass
+        self._copy_params(trajgen)
+        self.solve()
+
+    def _copy_params(self, trajgen):
+        self.start_pos = trajgen.start_pos
+        self.start_vel = trajgen.start_vel
+        self.final_pos = trajgen.final_pos
+        self.final_vel = trajgen.final_vel
+        self.T = trajgen.T
+        self.ndof = trajgen.ndof
+        self.X = [None] * self.ndof
+        # Default acceleration/deceleration time
+        self.accel_time_ratio = 0.2
+        self.decel_time_ratio = 0.2
+        self.params = [None] * self.ndof
+
+    def solve(self):
+        """
+        Calculate the parameters needed for the trapezoidal velocity profile.
+        For each DOF, calculate acceleration, cruise velocity, and phase transition times.
+        """
+        for i in range(self.ndof):
+            # Calculate trajectory parameters
+            t_accel = self.T * self.accel_time_ratio
+            t_decel = self.T * self.decel_time_ratio
+            t_cruise = self.T - t_accel - t_decel
+            
+            # Calculate distance to travel
+            total_distance = self.final_pos[i] - self.start_pos[i]
+            
+            # Calculate cruise velocity
+            v_cruise = total_distance / (t_cruise + 0.5*t_accel + 0.5*t_decel)
+            
+            # Calculate acceleration and deceleration
+            accel = v_cruise / t_accel
+            decel = -v_cruise / t_decel
+            
+            self.params[i] = {
+                'accel': accel,
+                'decel': decel,
+                'v_cruise': v_cruise,
+                't_accel': t_accel,
+                't_cruise': t_cruise + t_accel,
+                't_decel': self.T
+            }
+
+    def generate(self, nsteps=100):
+        """
+        Generate position, velocity, and acceleration profiles for trapezoidal velocity.
+        """
+        self.t = np.linspace(0, self.T, nsteps)
+
+        for i in range(self.ndof):
+            q, qd, qdd = [], [], []
+            p = self.params[i]
+            
+            for t in self.t:
+                if t < p['t_accel']:
+                    pos = self.start_pos[i] + self.start_vel[i]*t + 0.5*p['accel']*t**2
+                    vel = self.start_vel[i] + p['accel']*t
+                    # Constant acceleration
+                    acc = p['accel']
+                    
+                elif t < p['t_cruise']:
+                    t_since_accel = t - p['t_accel']
+                    q_accel_end = self.start_pos[i] + self.start_vel[i]*p['t_accel'] + 0.5*p['accel']*p['t_accel']**2
+                    pos = q_accel_end + p['v_cruise']*t_since_accel
+                    # Constant Velocity & Zero Acceleration
+                    vel = p['v_cruise']
+                    acc = 0
+                    
+                else:
+                    t_since_decel = t - p['t_cruise']
+                    q_cruise_end = self.start_pos[i] + \
+                                  self.start_vel[i]*p['t_accel'] + \
+                                  0.5*p['accel']*p['t_accel']**2 + \
+                                  p['v_cruise']*(p['t_cruise'] - p['t_accel'])
+                    pos = q_cruise_end + p['v_cruise']*t_since_decel + 0.5*p['decel']*t_since_decel**2
+                    vel = p['v_cruise'] + p['decel']*t_since_decel
+                    acc = p['decel']
+                
+                q.append(pos)
+                qd.append(vel)
+                qdd.append(acc)
+                
+            self.X[i] = [q, qd, qdd]
+        return self.X
