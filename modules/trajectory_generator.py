@@ -255,98 +255,122 @@ class QuinticPolynomial():
             self.X[i] = [q, qd, qdd]
         return self.X
     
-
-
 class TrapezoidVelocity():
     """
     Trapezoidal velocity profile generator for constant acceleration/deceleration phases.
+    Generates position (q), velocity (qd), and acceleration (qdd) over time.
+    Kinematics: uses basic equations s = s0 + v0*t + 0.5*a*t^2 and v = v0 + a*t.
     """
-
     def __init__(self, trajgen):
         self._copy_params(trajgen)
         self.solve()
 
     def _copy_params(self, trajgen):
-        self.start_pos = trajgen.start_pos
-        self.start_vel = trajgen.start_vel
-        self.final_pos = trajgen.final_pos
-        self.final_vel = trajgen.final_vel
-        self.T = trajgen.T
-        self.ndof = trajgen.ndof
-        self.X = [None] * self.ndof
-        # Default acceleration/deceleration time
-        self.accel_time_ratio = 0.2
-        self.decel_time_ratio = 0.2
-        self.params = [None] * self.ndof
+        """
+        Copy initial and final conditions from an external trajectory generator object.
+        """
+        self.start_pos = trajgen.start_pos     # start positions for each DOF
+        self.start_vel = trajgen.start_vel     # start velocities for each DOF
+        self.final_pos = trajgen.final_pos     # target positions for each DOF
+        self.final_vel = trajgen.final_vel     # desired end velocities (often zero)
+        self.T = trajgen.T                     # total motion duration
+        self.ndof = trajgen.ndof               # number of degrees of freedom
+        self.X = [None] * self.ndof            # placeholder for computed profiles
+        # Fraction of total time allocated to accel/decel
+        self.accel_time_ratio = 0.2            # 20% of T to accelerate
+        self.decel_time_ratio = 0.2            # 20% of T to decelerate
+        self.params = [None] * self.ndof       # store kinematic parameters
 
     def solve(self):
         """
-        Calculate the parameters needed for the trapezoidal velocity profile.
-        For each DOF, calculate acceleration, cruise velocity, and phase transition times.
+        Compute parameters for each DOF:
+        - t_accel: duration of acceleration phase
+        - t_cruise: duration of constant-speed cruise phase
+        - t_decel: end time of deceleration (equal to total T)
+        - v_cruise: constant cruise speed to satisfy boundary conditions
+        - accel/decel magnitudes based on v_cruise
         """
         for i in range(self.ndof):
-            # Calculate trajectory parameters
-            t_accel = self.T * self.accel_time_ratio
-            t_decel = self.T * self.decel_time_ratio
-            t_cruise = self.T - t_accel - t_decel
-            
-            # Calculate distance to travel
+            # Phase durations
+            t_accel = self.T * self.accel_time_ratio   # time accelerating
+            t_decel = self.T * self.decel_time_ratio   # time decelerating
+            t_cruise = self.T - t_accel - t_decel      # time at constant speed
+
+            # Displacement to cover
             total_distance = self.final_pos[i] - self.start_pos[i]
-            
-            # Calculate cruise velocity
+
+            # Solve for cruise velocity using area under velocity-time graph:
+            # distance = v_cruise*t_cruise + 0.5*v_cruise*t_accel + 0.5*v_cruise*t_decel
             v_cruise = total_distance / (t_cruise + 0.5*t_accel + 0.5*t_decel)
-            
-            # Calculate acceleration and deceleration
+
+            # Constant acceleration: a = v_cruise / t_accel
             accel = v_cruise / t_accel
+            # Constant deceleration: decel = -v_cruise / t_decel
             decel = -v_cruise / t_decel
-            
+
             self.params[i] = {
                 'accel': accel,
                 'decel': decel,
                 'v_cruise': v_cruise,
-                't_accel': t_accel,
-                't_cruise': t_cruise + t_accel,
-                't_decel': self.T
+                't_accel': t_accel,                   # end of accel phase
+                't_cruise': t_accel + t_cruise,       # end of cruise phase
+                't_decel': self.T                     # end of decel phase (total)
             }
 
     def generate(self, nsteps=100):
         """
-        Generate position, velocity, and acceleration profiles for trapezoidal velocity.
+        Sample trajectory at nsteps between t=0 and t=T.
+        Returns list per DOF: [positions, velocities, accelerations].
         """
         self.t = np.linspace(0, self.T, nsteps)
 
         for i in range(self.ndof):
-            q, qd, qdd = [], [], []
             p = self.params[i]
-            
+            t_accel = p['t_accel']
+            t_cruise = p['t_cruise']
+
+            # Precompute end-of-acceleration and end-of-cruise positions
+            q_accel_end = (
+                self.start_pos[i]
+                + self.start_vel[i]*t_accel
+                + 0.5*p['accel']*t_accel**2
+            )
+            cruise_duration = t_cruise - t_accel
+            q_cruise_end = q_accel_end + p['v_cruise']*cruise_duration
+
+            q, qd, qdd = [], [], []
             for t in self.t:
-                if t < p['t_accel']:
-                    pos = self.start_pos[i] + self.start_vel[i]*t + 0.5*p['accel']*t**2
+                # Phase 1: Acceleration
+                if t < t_accel:
+                    pos = (
+                        self.start_pos[i]
+                        + self.start_vel[i]*t
+                        + 0.5*p['accel']*t**2
+                    )
                     vel = self.start_vel[i] + p['accel']*t
-                    # Constant acceleration
                     acc = p['accel']
-                    
-                elif t < p['t_cruise']:
-                    t_since_accel = t - p['t_accel']
-                    q_accel_end = self.start_pos[i] + self.start_vel[i]*p['t_accel'] + 0.5*p['accel']*p['t_accel']**2
+
+                # Phase 2: Cruise (constant velocity)
+                elif t < t_cruise:
+                    t_since_accel = t - t_accel
                     pos = q_accel_end + p['v_cruise']*t_since_accel
-                    # Constant Velocity & Zero Acceleration
                     vel = p['v_cruise']
                     acc = 0
-                    
+
+                # Phase 3: Deceleration
                 else:
-                    t_since_decel = t - p['t_cruise']
-                    q_cruise_end = self.start_pos[i] + \
-                                  self.start_vel[i]*p['t_accel'] + \
-                                  0.5*p['accel']*p['t_accel']**2 + \
-                                  p['v_cruise']*(p['t_cruise'] - p['t_accel'])
-                    pos = q_cruise_end + p['v_cruise']*t_since_decel + 0.5*p['decel']*t_since_decel**2
+                    t_since_decel = t - t_cruise
+                    pos = (
+                        q_cruise_end
+                        + p['v_cruise']*t_since_decel
+                        + 0.5*p['decel']*t_since_decel**2
+                    )
                     vel = p['v_cruise'] + p['decel']*t_since_decel
                     acc = p['decel']
-                
+
                 q.append(pos)
                 qd.append(vel)
                 qdd.append(acc)
-                
+
             self.X[i] = [q, qd, qdd]
         return self.X
